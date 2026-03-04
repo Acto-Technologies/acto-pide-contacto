@@ -1,0 +1,22 @@
+name: Production Deploy
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  process-contact:
+    if: startsWith(github.event.comment.body, '/deploy')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+    - uses: actions/checkout@v3
+    - name: Process Deployment Request
+      env:
+        PROD_FLAG: ${{ secrets.PROD_FLAG }}
+      run: |
+        chmod +x ./app/deploy.sh
+        echo "Processing deployment request..."
+        ./app/deploy.sh ${{ github.event.comment.body }}
