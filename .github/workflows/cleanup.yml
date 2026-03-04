@@ -1,0 +1,43 @@
+name: Cleanup
+
+on:
+  issue_comment:
+    types: [created]
+  schedule:
+    - cron: "*/5 * * * *" # Fallback
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Wait for 2 minutes
+        if: github.event_name == 'issue_comment'
+        run: sleep 90
+
+      - name: Cleanup history
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh run list --json databaseId --limit 100 | jq '.[5:] | .[].databaseId' | xargs -I {} gh run delete {} || true
+
+      - name: Cleanup issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ISSUES=$(gh issue list --state open --json number | jq '.[].number')
+          
+          for issue in $ISSUES; do
+            COMMENTS=$(gh api "/repos/:owner/:repo/issues/$issue/comments" --jq '.[].id')
+            
+            for comment in $COMMENTS; do
+              gh api -X DELETE "/repos/:owner/:repo/issues/comments/$comment" || true
+            done
+          done
+          
+          gh pr list --state open --json number | jq '.[].number' | xargs -I {} gh pr close {} || true
